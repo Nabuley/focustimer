@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>집중 타이머</title>
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .container {
+        background: white;
+        padding: 30px;
+        width: 100%;
+        max-width: 420px;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        z-index: 10;
+        position: relative;
+        margin: 0 auto;
+    }
+
+    h1 {
+        text-align: center;
+        margin: 0 0 20px 0;
+        color: #333;
+        font-size: 28px;
+        font-weight: 600;
+    }
+
+    .mode {
+        text-align: center;
+        font-weight: 600;
+        font-size: 16px;
+        color: #667eea;
+        margin-bottom: 15px;
+        padding: 8px 16px;
+        background: #f0f4ff;
+        border-radius: 20px;
+        display: inline-block;
+        width: 100%;
+    }
+
+    .timer {
+        font-size: 56px;
+        text-align: center;
+        margin: 20px 0 30px 0;
+        font-weight: 700;
+        color: #333;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 2px;
+    }
+
+    .button-group {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .button-group.single {
+        grid-template-columns: 1fr;
+    }
+
+    button {
+        padding: 12px 20px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        color: white;
+    }
+
+    #startBtn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    #startBtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    #stopBtn {
+        background: #ff6b6b;
+    }
+
+    #stopBtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+    }
+
+    #resetTimeBtn {
+        background: #51cf66;
+    }
+
+    #resetTimeBtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(81, 207, 102, 0.4);
+    }
+
+    #resetAllBtn {
+        background: #868e96;
+    }
+
+    #resetAllBtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(134, 142, 150, 0.4);
+    }
+
+    button:active {
+        transform: translateY(0);
+    }
+
+    .controls {
+        margin-top: 25px;
+        padding-top: 25px;
+        border-top: 2px solid #f1f3f5;
+    }
+
+    .controls label {
+        display: block;
+        margin-top: 15px;
+        margin-bottom: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    input[type="number"] {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 15px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        transition: border-color 0.3s;
+    }
+
+    input[type="number"]:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    textarea {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 14px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        resize: none;
+        font-family: inherit;
+        transition: border-color 0.3s;
+        height: 70px;
+    }
+
+    textarea:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    #submitDistractionBtn {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        margin-top: 10px;
+    }
+
+    #submitDistractionBtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(240, 147, 251, 0.4);
+    }
+
+    #clearPostItBtn {
+        background: #ffa94d;
+        margin-top: 8px;
+    }
+
+    #clearPostItBtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(255, 169, 77, 0.4);
+    }
+
+    .stats {
+        margin-top: 25px;
+        margin-bottom: 10px;
+        padding: 15px;
+        font-size: 14px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 10px;
+        line-height: 1.8;
+    }
+
+    .stats strong {
+        color: #495057;
+        font-weight: 600;
+    }
+
+    .stat-value {
+        color: #667eea;
+        font-weight: 700;
+    }
+
+    /* 포스트잇 */
+    .post-it {
+        position: fixed;
+        width: 160px;
+        min-height: 100px;
+        background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%);
+        padding: 25px 12px 12px 12px;
+        font-size: 13px;
+        border-radius: 4px;
+        box-shadow: 3px 3px 12px rgba(0,0,0,0.15);
+        word-break: break-word;
+        transform: rotate(var(--rot));
+        z-index: 1;
+        line-height: 1.5;
+        color: #333;
+        border-top: 20px solid rgba(255, 193, 7, 0.3);
+    }
+
+    .post-it button {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        font-size: 16px;
+        line-height: 22px;
+        border: none;
+        border-radius: 50%;
+        background: #ff6b6b;
+        color: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: bold;
+    }
+
+    .post-it button:hover {
+        background: #fa5252;
+        transform: scale(1.1);
+    }
+
+    @media (max-width: 480px) {
+        body {
+            padding: 15px;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 24px;
+        }
+
+        .timer {
+            font-size: 48px;
+        }
+    }
+</style>
+</head>
+<body>
+
+<div class="container" id="uiContainer">
+    <h1>집중 타이머</h1>
+
+    <div class="mode" id="mode">공부 중</div>
+    <div class="timer" id="timer">25:00</div>
+
+    <div class="button-group">
+        <button id="startBtn">시작</button>
+        <button id="stopBtn">정지</button>
+    </div>
+
+    <div class="button-group">
+        <button id="resetTimeBtn">시간 초기화</button>
+        <button id="resetAllBtn">전체 초기화</button>
+    </div>
+
+    <div class="controls">
+        <label>공부 시간 (분)</label>
+        <input type="number" id="studyTime" value="25" min="1">
+
+        <label>휴식 시간 (분)</label>
+        <input type="number" id="breakTime" value="5" min="1">
+
+        <label>글자당 추가 시간 (초)</label>
+        <input type="number" id="penaltyPerChar" value="5" min="1">
+
+        <label>딴짓 입력란</label>
+        <textarea id="distractionInput" placeholder="딴생각이 나면 여기에 적으세요..."></textarea>
+
+        <div class="button-group single">
+            <button id="submitDistractionBtn">제출</button>
+        </div>
+        <div class="button-group single">
+            <button id="clearPostItBtn">포스트잇 전체 제거</button>
+        </div>
+    </div>
+
+    <div class="stats">
+        <strong>통계</strong><br>
+        공부 횟수: <span class="stat-value" id="sessionCount">0</span>회<br>
+        총 공부 시간: <span class="stat-value" id="totalTime">0</span>초
+    </div>
+</div>
+
+<script>
+let timerInterval = null;
+let remainingSeconds = 0;
+let isStudy = true;
+
+let sessionCount = Number(localStorage.getItem("sessionCount")) || 0;
+let totalStudyTime = Number(localStorage.getItem("totalStudyTime")) || 0;
+
+const ui = document.getElementById("uiContainer");
+const timerEl = document.getElementById("timer");
+const modeEl = document.getElementById("mode");
+const distractionInput = document.getElementById("distractionInput");
+
+const studyTime = document.getElementById("studyTime");
+const breakTime = document.getElementById("breakTime");
+const penaltyPerChar = document.getElementById("penaltyPerChar");
+
+document.getElementById("sessionCount").innerText = sessionCount;
+document.getElementById("totalTime").innerText = totalStudyTime;
+
+function updateTimerDisplay() {
+    const min = Math.floor(remainingSeconds / 60);
+    const sec = remainingSeconds % 60;
+    timerEl.innerText =
+        String(min).padStart(2, "0") + ":" + String(sec).padStart(2, "0");
+}
+
+function getCurrentModeSeconds() {
+    return (isStudy ? Number(studyTime.value) : Number(breakTime.value)) * 60;
+}
+
+document.getElementById("startBtn").onclick = () => {
+    if (timerInterval) return;
+    if (remainingSeconds <= 0) remainingSeconds = getCurrentModeSeconds();
+
+    timerInterval = setInterval(() => {
+        remainingSeconds--;
+
+        if (isStudy) {
+            totalStudyTime++;
+            localStorage.setItem("totalStudyTime", totalStudyTime);
+            document.getElementById("totalTime").innerText = totalStudyTime;
+        }
+
+        updateTimerDisplay();
+
+        if (remainingSeconds <= 0) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+
+            if (isStudy) {
+                sessionCount++;
+                localStorage.setItem("sessionCount", sessionCount);
+                document.getElementById("sessionCount").innerText = sessionCount;
+            }
+
+            isStudy = !isStudy;
+            modeEl.innerText = isStudy ? "공부 중" : "휴식 중";
+        }
+    }, 1000);
+};
+
+document.getElementById("stopBtn").onclick = () => {
+    clearInterval(timerInterval);
+    timerInterval = null;
+};
+
+document.getElementById("resetTimeBtn").onclick = () => {
+    remainingSeconds = getCurrentModeSeconds();
+    updateTimerDisplay();
+};
+
+document.getElementById("resetAllBtn").onclick = () => {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    isStudy = true;
+    sessionCount = 0;
+    totalStudyTime = 0;
+    localStorage.clear();
+    document.querySelectorAll(".post-it").forEach(p => p.remove());
+    distractionInput.value = "";
+    remainingSeconds = getCurrentModeSeconds();
+    modeEl.innerText = "공부 중";
+    document.getElementById("sessionCount").innerText = 0;
+    document.getElementById("totalTime").innerText = 0;
+    updateTimerDisplay();
+};
+
+document.getElementById("submitDistractionBtn").onclick = () => {
+    const text = distractionInput.value.trim();
+    if (!text) return;
+
+    if (isStudy) {
+        const penalty = Number(penaltyPerChar.value);
+        const addedSeconds = text.length * penalty;
+        remainingSeconds += addedSeconds;
+        updateTimerDisplay();
+    }
+
+    const rect = ui.getBoundingClientRect();
+    const areas = [
+        { x: [0, rect.left - 170], y: [0, window.innerHeight - 130] },
+        { x: [rect.right + 10, window.innerWidth - 170], y: [0, window.innerHeight - 130] }
+    ];
+    const area = areas[Math.floor(Math.random() * areas.length)];
+    if (area.x[1] <= area.x[0]) return;
+
+    const x = Math.random() * (area.x[1] - area.x[0]) + area.x[0];
+    const y = Math.random() * (area.y[1] - area.y[0]) + area.y[0];
+
+    const postIt = document.createElement("div");
+    postIt.className = "post-it";
+    postIt.style.left = x + "px";
+    postIt.style.top = y + "px";
+    postIt.style.setProperty("--rot", (Math.random() * 10 - 5) + "deg");
+
+    const closeBtn = document.createElement("button");
+    closeBtn.innerText = "×";
+    closeBtn.onclick = (e) => {
+        e.stopPropagation();
+        postIt.remove();
+    };
+
+    postIt.appendChild(closeBtn);
+    postIt.appendChild(document.createTextNode(text));
+    document.body.appendChild(postIt);
+
+    distractionInput.value = "";
+};
+
+document.getElementById("clearPostItBtn").onclick = () => {
+    document.querySelectorAll(".post-it").forEach(p => p.remove());
+};
+
+remainingSeconds = getCurrentModeSeconds();
+updateTimerDisplay();
+</script>
+
+</body>
+</html>
