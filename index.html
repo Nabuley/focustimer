@@ -701,10 +701,11 @@ let pauseStartTime = null;
 let sessionCount = Number(localStorage.getItem("sessionCount")) || 0;
 let totalStudyTime = Number(localStorage.getItem("totalStudyTime")) || 0;
 let timeline = JSON.parse(localStorage.getItem("timeline")) || [];
-let timelineHistory = JSON.parse(localStorage.getItem("timelineHistory")) || {}; // 날짜별 타임라인 기록
-let currentStudyDate = localStorage.getItem("currentStudyDate") || getDateKey(); // 현재 공부 날짜
+let timelineHistory = JSON.parse(localStorage.getItem("timelineHistory")) || {};
+let currentStudyDate = localStorage.getItem("currentStudyDate") || getDateKey();
 let subjectColors = JSON.parse(localStorage.getItem("subjectColors")) || {};
 let dailyStats = JSON.parse(localStorage.getItem("dailyStats")) || {};
+let postIts = JSON.parse(localStorage.getItem("postIts")) || [];
 
 const ui = document.getElementById("uiContainer");
 const timerEl = document.getElementById("timer");
@@ -723,20 +724,9 @@ document.getElementById("totalTime").innerText = formatTotalTime(totalStudyTime)
 
 // 과목별 색상 팔레트 (빨간색 제외)
 const colorPalette = [
-    '#667eea', // 보라
-    '#f093fb', // 핑크
-    '#4facfe', // 하늘
-    '#43e97b', // 민트
-    '#fa709a', // 연분홍
-    '#feca57', // 노랑
-    '#48dbfb', // 청록
-    '#ff9ff3', // 자주
-    '#54a0ff', // 파랑
-    '#00d2d3', // 청록2
-    '#5f27cd', // 진보라
-    '#ff9068', // 주황 (빨간색 대신)
-    '#1dd1a1', // 녹색
-    '#ee5a6f', // 장미
+    '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#feca57',
+    '#48dbfb', '#ff9ff3', '#54a0ff', '#00d2d3', '#5f27cd', '#ff9068',
+    '#1dd1a1', '#ee5a6f',
 ];
 
 // 총 공부시간 형식 변환 (초 → H:MM:SS)
@@ -754,24 +744,12 @@ function getDateKey(date = new Date()) {
 
 // 날짜에서 n일 더하기/빼기
 function addDays(dateStr, days) {
-    const date = new Date(dateStr + 'T12:00:00'); // 시간대 문제 방지를 위해 정오로 설정
+    const date = new Date(dateStr + 'T12:00:00');
     date.setDate(date.getDate() + days);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-}
-
-// 타임라인에서 가장 이른 시작 시간 찾기
-function getEarliestStartTime() {
-    if (timeline.length === 0) return null;
-    return Math.min(...timeline.map(item => item.startTime));
-}
-
-// 타임스탬프로부터 날짜 추천
-function getSuggestedDate(timestamp) {
-    const date = new Date(timestamp);
-    return getDateKey(date);
 }
 
 // 날짜를 한글로 표시
@@ -803,13 +781,12 @@ function updateStudyDateDisplay() {
 
 // 일일 통계 업데이트
 function updateDailyStats(studySeconds) {
-    const today = currentStudyDate; // 현재 공부 날짜 사용
+    const today = currentStudyDate;
     if (!dailyStats[today]) {
         dailyStats[today] = 0;
     }
     dailyStats[today] += studySeconds;
     
-    // 30일 이전 데이터 정리
     const keys = Object.keys(dailyStats).sort();
     if (keys.length > 30) {
         const toDelete = keys.slice(0, keys.length - 30);
@@ -825,7 +802,6 @@ let trendChart = null;
 function updateTrendChart() {
     const ctx = document.getElementById('trendChart').getContext('2d');
     
-    // 최근 30일 날짜 생성
     const dates = [];
     const data = [];
     const today = new Date();
@@ -835,7 +811,7 @@ function updateTrendChart() {
         date.setDate(date.getDate() - i);
         const dateKey = getDateKey(date);
         dates.push(dateKey);
-        data.push(Math.floor((dailyStats[dateKey] || 0) / 60)); // 분 단위로 변환
+        data.push(Math.floor((dailyStats[dateKey] || 0) / 60));
     }
     
     if (trendChart) {
@@ -1027,7 +1003,7 @@ function updateTimeline() {
         if (item.type === 'break') {
             color = '#51cf66';
         } else if (item.type === 'pause') {
-            color = '#ff6b6b'; // 중단은 빨간색
+            color = '#ff6b6b';
         } else {
             color = getColorForSubject(item.subject);
         }
@@ -1098,6 +1074,107 @@ function addToTimeline(type, subject, duration, startTime, endTime) {
     updateTimeline();
 }
 
+// 포스트잇 저장
+function savePostIts() {
+    const postItElements = document.querySelectorAll('.post-it');
+    postIts = Array.from(postItElements).map(el => ({
+        text: el.childNodes[1].textContent,
+        left: el.style.left,
+        top: el.style.top,
+        rotation: el.style.getPropertyValue('--rot')
+    }));
+    localStorage.setItem("postIts", JSON.stringify(postIts));
+}
+
+// 포스트잇 복원
+function restorePostIts() {
+    postIts.forEach(data => {
+        createPostIt(data.text, parseFloat(data.left), parseFloat(data.top), data.rotation);
+    });
+}
+
+// 포스트잇 생성 함수
+function createPostIt(text, x, y, rotation) {
+    const postIt = document.createElement("div");
+    postIt.className = "post-it";
+    postIt.style.left = x + "px";
+    postIt.style.top = y + "px";
+    postIt.style.setProperty("--rot", rotation);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.innerText = "×";
+    closeBtn.onclick = (e) => {
+        e.stopPropagation();
+        postIt.remove();
+        savePostIts();
+    };
+
+    postIt.appendChild(closeBtn);
+    postIt.appendChild(document.createTextNode(text));
+    document.body.appendChild(postIt);
+
+    // 포스트잇 드래그 기능
+    let isDragging = false;
+    let startX, startY, offsetX, offsetY;
+
+    postIt.addEventListener("mousedown", dragStart);
+    postIt.addEventListener("touchstart", dragStart);
+
+    function dragStart(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        
+        isDragging = true;
+        postIt.classList.add('dragging');
+
+        if (e.type === "touchstart") {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        } else {
+            startX = e.clientX;
+            startY = e.clientY;
+        }
+
+        const rect = postIt.getBoundingClientRect();
+        offsetX = startX - rect.left;
+        offsetY = startY - rect.top;
+
+        document.addEventListener("mousemove", drag);
+        document.addEventListener("touchmove", drag);
+        document.addEventListener("mouseup", dragEnd);
+        document.addEventListener("touchend", dragEnd);
+    }
+
+    function drag(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+
+        let currentX, currentY;
+
+        if (e.type === "touchmove") {
+            currentX = e.touches[0].clientX;
+            currentY = e.touches[0].clientY;
+        } else {
+            currentX = e.clientX;
+            currentY = e.clientY;
+        }
+
+        postIt.style.left = (currentX - offsetX) + "px";
+        postIt.style.top = (currentY - offsetY) + "px";
+    }
+
+    function dragEnd(e) {
+        isDragging = false;
+        postIt.classList.remove('dragging');
+
+        document.removeEventListener("mousemove", drag);
+        document.removeEventListener("touchmove", drag);
+        document.removeEventListener("mouseup", dragEnd);
+        document.removeEventListener("touchend", dragEnd);
+
+        savePostIts();
+    }
+}
+
 function tick() {
     const now = Date.now();
     
@@ -1116,7 +1193,6 @@ function tick() {
             localStorage.setItem("sessionCount", sessionCount);
             document.getElementById("sessionCount").innerText = sessionCount;
             
-            // 일일 통계 업데이트
             updateDailyStats(duration);
         } else {
             addToTimeline('break', '', duration, sessionStartTime, endTime);
@@ -1145,7 +1221,6 @@ function tick() {
 document.getElementById("startBtn").onclick = () => {
     if (timerInterval) return;
     
-    // 중단에서 복귀하는 경우 - 중단 시간 기록
     if (pauseStartTime) {
         const pauseEnd = Date.now();
         const pauseDuration = Math.floor((pauseEnd - pauseStartTime) / 1000);
@@ -1173,7 +1248,6 @@ document.getElementById("stopBtn").onclick = () => {
         clearInterval(timerInterval);
         timerInterval = null;
         
-        // 진행 중이던 세션 기록 추가
         if (sessionStartTime && targetEndTime) {
             const now = Date.now();
             const sessionDuration = Math.floor((now - sessionStartTime) / 1000);
@@ -1183,7 +1257,6 @@ document.getElementById("stopBtn").onclick = () => {
                     const subject = currentSubjectInput.value.trim();
                     addToTimeline('study', subject, sessionDuration, sessionStartTime, now);
                     
-                    // 공부 시간 통계 반영
                     updateDailyStats(sessionDuration);
                 } else {
                     addToTimeline('break', '', sessionDuration, sessionStartTime, now);
@@ -1197,7 +1270,6 @@ document.getElementById("stopBtn").onclick = () => {
             updateTimerDisplay();
         }
         
-        // 중단 시작 시간 기록
         pauseStartTime = Date.now();
         
         targetEndTime = null;
@@ -1206,7 +1278,6 @@ document.getElementById("stopBtn").onclick = () => {
 };
 
 document.getElementById("resetTimeBtn").onclick = () => {
-    // 중단 중이었다면 중단 시간 기록
     if (pauseStartTime && !timerInterval) {
         const pauseEnd = Date.now();
         const pauseDuration = Math.floor((pauseEnd - pauseStartTime) / 1000);
@@ -1224,7 +1295,6 @@ document.getElementById("resetTimeBtn").onclick = () => {
     targetEndTime = null;
 };
 
-// 하루 초기화 버튼
 document.getElementById("resetDayBtn").onclick = () => {
     if (timeline.length === 0 && !timerInterval && !pauseStartTime) {
         alert('초기화할 내용이 없습니다.');
@@ -1232,17 +1302,14 @@ document.getElementById("resetDayBtn").onclick = () => {
     }
     
     if (confirm('오늘의 타임라인과 진행 중인 타이머가 모두 초기화됩니다.\n저장된 히스토리는 유지됩니다.\n\n계속하시겠습니까?')) {
-        // 타이머 정지
         if (timerInterval) {
             clearInterval(timerInterval);
             timerInterval = null;
         }
         
-        // 타임라인 초기화
         timeline = [];
         localStorage.setItem("timeline", JSON.stringify(timeline));
         
-        // 타이머 상태 초기화
         sessionStartTime = null;
         targetEndTime = null;
         pauseStartTime = null;
@@ -1250,15 +1317,14 @@ document.getElementById("resetDayBtn").onclick = () => {
         isStudy = true;
         modeEl.innerText = "공부 중";
         
-        // 포스트잇 제거
         document.querySelectorAll(".post-it").forEach(p => p.remove());
+        postIts = [];
+        localStorage.setItem("postIts", JSON.stringify(postIts));
         distractionInput.value = "";
         
-        // 현재 공부 날짜는 오늘로 설정
         currentStudyDate = getDateKey();
         localStorage.setItem("currentStudyDate", currentStudyDate);
         
-        // 화면 업데이트
         updateTimerDisplay();
         updateTimeline();
         updateStudyDateDisplay();
@@ -1279,6 +1345,7 @@ document.getElementById("resetAllBtn").onclick = () => {
         currentStudyDate = getDateKey();
         subjectColors = {};
         dailyStats = {};
+        postIts = [];
         sessionStartTime = null;
         targetEndTime = null;
         pauseStartTime = null;
@@ -1323,99 +1390,18 @@ document.getElementById("submitDistractionBtn").onclick = () => {
 
     const x = Math.random() * (area.x[1] - area.x[0]) + area.x[0];
     const y = Math.random() * (area.y[1] - area.y[0]) + area.y[0];
+    const rotation = (Math.random() * 10 - 5) + "deg";
 
-    const postIt = document.createElement("div");
-    postIt.className = "post-it";
-    postIt.style.left = x + "px";
-    postIt.style.top = y + "px";
-    postIt.style.setProperty("--rot", (Math.random() * 10 - 5) + "deg");
-
-    const closeBtn = document.createElement("button");
-    closeBtn.innerText = "×";
-    closeBtn.onclick = (e) => {
-        e.stopPropagation();
-        postIt.remove();
-    };
-
-    postIt.appendChild(closeBtn);
-    postIt.appendChild(document.createTextNode(text));
-    document.body.appendChild(postIt);
-
-    // 포스트잇 드래그 기능
-    let isDragging = false;
-    let currentX;
-    let currentY;
-    let initialX;
-    let initialY;
-    let xOffset = 0;
-    let yOffset = 0;
-
-    postIt.addEventListener("mousedown", dragStart);
-    postIt.addEventListener("touchstart", dragStart);
-
-    function dragStart(e) {
-        if (e.target.tagName === 'BUTTON') return; // 닫기 버튼 클릭 시 드래그 방지
-        
-        if (e.type === "touchstart") {
-            initialX = e.touches[0].clientX - xOffset;
-            initialY = e.touches[0].clientY - yOffset;
-        } else {
-            initialX = e.clientX - xOffset;
-            initialY = e.clientY - yOffset;
-        }
-
-        isDragging = true;
-        postIt.classList.add('dragging');
-
-        document.addEventListener("mousemove", drag);
-        document.addEventListener("touchmove", drag);
-        document.addEventListener("mouseup", dragEnd);
-        document.addEventListener("touchend", dragEnd);
-    }
-
-    function drag(e) {
-        if (!isDragging) return;
-
-        e.preventDefault();
-
-        if (e.type === "touchmove") {
-            currentX = e.touches[0].clientX - initialX;
-            currentY = e.touches[0].clientY - initialY;
-        } else {
-            currentX = e.clientX - initialX;
-            currentY = e.clientY - initialY;
-        }
-
-        xOffset = currentX;
-        yOffset = currentY;
-
-        const currentLeft = parseFloat(postIt.style.left);
-        const currentTop = parseFloat(postIt.style.top);
-
-        postIt.style.left = (currentLeft + currentX - (parseFloat(postIt.dataset.lastX) || 0)) + "px";
-        postIt.style.top = (currentTop + currentY - (parseFloat(postIt.dataset.lastY) || 0)) + "px";
-
-        postIt.dataset.lastX = currentX;
-        postIt.dataset.lastY = currentY;
-    }
-
-    function dragEnd(e) {
-        isDragging = false;
-        postIt.classList.remove('dragging');
-        postIt.dataset.lastX = 0;
-        postIt.dataset.lastY = 0;
-
-        document.removeEventListener("mousemove", drag);
-        document.removeEventListener("touchmove", drag);
-        document.removeEventListener("mouseup", dragEnd);
-        document.removeEventListener("touchend", dragEnd);
-    }
+    createPostIt(text, x, y, rotation);
+    savePostIts();
 
     distractionInput.value = "";
 };
 
 document.getElementById("clearPostItBtn").onclick = () => {
     document.querySelectorAll(".post-it").forEach(p => p.remove());
+    postIts = [];
+    localStorage.setItem("postIts", JSON.stringify(postIts));
 };
 
 // 날짜 선택 모달 표시
@@ -1423,11 +1409,9 @@ function showDateSelectModal(callback) {
     const today = getDateKey();
     const yesterday = addDays(today, -1);
     
-    // 기존 기록 확인
     const todayHasRecord = timelineHistory[today] && timelineHistory[today].length > 0;
     const yesterdayHasRecord = timelineHistory[yesterday] && timelineHistory[yesterday].length > 0;
     
-    // 모달 생성
     const modal = document.createElement('div');
     modal.className = 'date-select-modal';
     
@@ -1454,7 +1438,6 @@ function showDateSelectModal(callback) {
     
     document.body.appendChild(modal);
     
-    // 날짜 옵션 클릭
     modal.querySelectorAll('.date-option').forEach(option => {
         option.onclick = () => {
             const selectedDate = option.getAttribute('data-date');
@@ -1463,13 +1446,11 @@ function showDateSelectModal(callback) {
         };
     });
     
-    // 취소 버튼
     modal.querySelector('.date-select-cancel').onclick = () => {
         modal.remove();
         callback(null);
     };
     
-    // 배경 클릭으로 닫기
     modal.onclick = (e) => {
         if (e.target === modal) {
             modal.remove();
@@ -1478,7 +1459,6 @@ function showDateSelectModal(callback) {
     };
 }
 
-// 타임라인에서 공부 시간 계산
 function calculateStudyTimeFromTimeline(timelineArray) {
     let totalStudy = 0;
     timelineArray.forEach(item => {
@@ -1489,21 +1469,17 @@ function calculateStudyTimeFromTimeline(timelineArray) {
     return totalStudy;
 }
 
-// 하루 마무리 버튼
 document.getElementById("finishDayBtn").onclick = () => {
     if (timeline.length === 0) {
         alert('오늘의 기록이 없습니다.');
         return;
     }
     
-    // 진행 중인 타이머가 있으면 경고
     if (timerInterval) {
         if (!confirm('타이머가 진행 중입니다. 정지하고 하루를 마무리하시겠습니까?')) {
             return;
         }
-        // 정지 버튼 클릭 시뮬레이션
         document.getElementById("stopBtn").click();
-        // 정지 처리가 완료될 시간을 주기 위해 약간 대기
         setTimeout(() => finishDayProcess(), 100);
         return;
     }
@@ -1512,7 +1488,6 @@ document.getElementById("finishDayBtn").onclick = () => {
 };
 
 function finishDayProcess() {
-    // 중단 중이면 중단 시간도 기록
     if (pauseStartTime) {
         const pauseEnd = Date.now();
         const pauseDuration = Math.floor((pauseEnd - pauseStartTime) / 1000);
@@ -1524,14 +1499,8 @@ function finishDayProcess() {
         pauseStartTime = null;
     }
     
-    // 현재 타임라인에서 공부 시간 계산
     const studyTime = calculateStudyTimeFromTimeline(timeline);
     
-    console.log('=== 하루 마무리 디버그 ===');
-    console.log('현재 타임라인:', timeline);
-    console.log('계산된 공부 시간:', studyTime, '초');
-    
-    // 날짜 선택 모달 표시
     showDateSelectModal((selectedDate) => {
         if (!selectedDate) {
             alert('취소되었습니다.');
@@ -1540,19 +1509,12 @@ function finishDayProcess() {
         
         const today = getDateKey();
         
-        console.log('선택한 날짜:', selectedDate);
-        console.log('오늘 날짜:', today);
-        
-        // 선택한 날짜에 타임라인 저장 (추가)
         if (!timelineHistory[selectedDate]) {
             timelineHistory[selectedDate] = [];
         }
         timelineHistory[selectedDate] = [...timelineHistory[selectedDate], ...timeline];
         localStorage.setItem("timelineHistory", JSON.stringify(timelineHistory));
         
-        console.log('저장 전 dailyStats:', JSON.parse(JSON.stringify(dailyStats)));
-        
-        // 현재 날짜(오늘)의 dailyStats에서 공부 시간 차감
         if (dailyStats[today]) {
             dailyStats[today] = Math.max(0, dailyStats[today] - studyTime);
             if (dailyStats[today] === 0) {
@@ -1560,15 +1522,11 @@ function finishDayProcess() {
             }
         }
         
-        // 선택한 날짜의 dailyStats에 추가
         if (!dailyStats[selectedDate]) {
             dailyStats[selectedDate] = 0;
         }
         dailyStats[selectedDate] += studyTime;
         
-        console.log('저장 후 dailyStats:', JSON.parse(JSON.stringify(dailyStats)));
-        
-        // 30일 이전 데이터 정리
         const keys = Object.keys(dailyStats).sort();
         if (keys.length > 30) {
             const toDelete = keys.slice(0, keys.length - 30);
@@ -1577,18 +1535,13 @@ function finishDayProcess() {
         
         localStorage.setItem("dailyStats", JSON.stringify(dailyStats));
         
-        console.log('localStorage에 저장된 dailyStats:', localStorage.getItem("dailyStats"));
-        
-        // 그래프 업데이트
         updateTrendChart();
         
         alert(`${selectedDate}에 저장되었습니다!\n공부 시간: ${Math.floor(studyTime/60)}분 ${studyTime%60}초`);
         
-        // 타임라인 초기화
         timeline = [];
         localStorage.setItem("timeline", JSON.stringify(timeline));
         
-        // 통계 초기화 (공부 횟수와 총 공부 시간)
         sessionCount = 0;
         totalStudyTime = 0;
         localStorage.setItem("sessionCount", sessionCount);
@@ -1596,15 +1549,12 @@ function finishDayProcess() {
         document.getElementById("sessionCount").innerText = sessionCount;
         document.getElementById("totalTime").innerText = formatTotalTime(totalStudyTime);
         
-        // 현재 공부 날짜를 실제 오늘로 업데이트
         currentStudyDate = today;
         localStorage.setItem("currentStudyDate", currentStudyDate);
         
-        // 화면 업데이트
         updateTimeline();
         updateStudyDateDisplay();
         
-        // 타이머 초기화
         remainingSeconds = getCurrentModeSeconds();
         updateTimerDisplay();
         sessionStartTime = null;
@@ -1613,6 +1563,9 @@ function finishDayProcess() {
         modeEl.innerText = "공부 중";
     });
 }
+
+// 페이지 로드 시 포스트잇 복원
+restorePostIts();
 
 remainingSeconds = getCurrentModeSeconds();
 updateTimerDisplay();
