@@ -139,7 +139,7 @@
         color: #495057;
     }
 
-    input[type="number"] {
+    input[type="number"], input[type="text"] {
         width: 100%;
         padding: 10px 12px;
         font-size: 15px;
@@ -148,7 +148,7 @@
         transition: border-color 0.3s;
     }
 
-    input[type="number"]:focus {
+    input[type="number"]:focus, input[type="text"]:focus {
         outline: none;
         border-color: #667eea;
     }
@@ -210,6 +210,199 @@
         font-weight: 700;
     }
 
+    /* 타임라인 - 스택형 바 차트 */
+    .timeline {
+        margin-top: 25px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 10px;
+    }
+
+    .timeline h3 {
+        margin: 0 0 15px 0;
+        font-size: 16px;
+        color: #495057;
+    }
+
+    .timeline-bar-container {
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        height: 40px;
+        display: flex;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .timeline-segment {
+        height: 100%;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        position: relative;
+        border-right: 1px solid rgba(255,255,255,0.3);
+    }
+
+    .timeline-segment:last-child {
+        border-right: none;
+    }
+
+    .timeline-segment:hover {
+        opacity: 0.8;
+        transform: scaleY(1.05);
+    }
+
+    .timeline-legend {
+        margin-top: 15px;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .timeline-legend-item {
+        display: flex;
+        align-items: center;
+        padding: 8px;
+        margin-bottom: 6px;
+        background: white;
+        border-radius: 6px;
+        font-size: 13px;
+    }
+
+    .timeline-legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        margin-right: 10px;
+        flex-shrink: 0;
+    }
+
+    .timeline-legend-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .timeline-legend-subject {
+        font-weight: 600;
+        color: #333;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .timeline-legend-time {
+        font-size: 11px;
+        color: #868e96;
+        margin-top: 2px;
+    }
+
+    /* 툴팁 */
+    .timeline-tooltip {
+        position: absolute;
+        bottom: 50px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.85);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s;
+        z-index: 100;
+    }
+
+    .timeline-segment:hover .timeline-tooltip {
+        opacity: 1;
+    }
+
+    /* 알림 */
+    .notification {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: white;
+        padding: 20px 25px;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        z-index: 1000;
+        min-width: 300px;
+        animation: slideIn 0.4s ease-out;
+    }
+
+    .notification.study {
+        border-left: 5px solid #667eea;
+    }
+
+    .notification.break {
+        border-left: 5px solid #51cf66;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+    }
+
+    .notification.hiding {
+        animation: slideOut 0.4s ease-out forwards;
+    }
+
+    .notification-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .notification-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #333;
+    }
+
+    .notification-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #868e96;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s;
+    }
+
+    .notification-close:hover {
+        background: #f1f3f5;
+        color: #495057;
+    }
+
+    .notification-message {
+        font-size: 15px;
+        color: #495057;
+        line-height: 1.5;
+    }
+
     /* 포스트잇 */
     .post-it {
         position: fixed;
@@ -267,6 +460,12 @@
         .timer {
             font-size: 48px;
         }
+
+        .notification {
+            right: 15px;
+            bottom: 15px;
+            min-width: 280px;
+        }
     }
 </style>
 </head>
@@ -274,6 +473,11 @@
 
 <div class="container" id="uiContainer">
     <h1>집중 타이머</h1>
+
+    <div class="controls" style="margin-top: 0; padding-top: 0; border-top: none;">
+        <label>현재 공부 과목</label>
+        <input type="text" id="currentSubject" placeholder="예: 수학, 영어, 과학...">
+    </div>
 
     <div class="mode" id="mode">공부 중</div>
     <div class="timer" id="timer">25:00</div>
@@ -314,20 +518,33 @@
         공부 횟수: <span class="stat-value" id="sessionCount">0</span>회<br>
         총 공부 시간: <span class="stat-value" id="totalTime">0</span>초
     </div>
+
+    <div class="timeline">
+        <h3>오늘의 타임라인</h3>
+        <div class="timeline-bar-container" id="timelineBar"></div>
+        <div class="timeline-legend" id="timelineLegend"></div>
+    </div>
 </div>
 
 <script>
 let timerInterval = null;
 let remainingSeconds = 0;
 let isStudy = true;
+let sessionStartTime = null;
+let targetEndTime = null;
 
 let sessionCount = Number(localStorage.getItem("sessionCount")) || 0;
 let totalStudyTime = Number(localStorage.getItem("totalStudyTime")) || 0;
+let timeline = JSON.parse(localStorage.getItem("timeline")) || [];
+let subjectColors = JSON.parse(localStorage.getItem("subjectColors")) || {};
 
 const ui = document.getElementById("uiContainer");
 const timerEl = document.getElementById("timer");
 const modeEl = document.getElementById("mode");
 const distractionInput = document.getElementById("distractionInput");
+const currentSubjectInput = document.getElementById("currentSubject");
+const timelineBar = document.getElementById("timelineBar");
+const timelineLegend = document.getElementById("timelineLegend");
 
 const studyTime = document.getElementById("studyTime");
 const breakTime = document.getElementById("breakTime");
@@ -335,6 +552,212 @@ const penaltyPerChar = document.getElementById("penaltyPerChar");
 
 document.getElementById("sessionCount").innerText = sessionCount;
 document.getElementById("totalTime").innerText = totalStudyTime;
+
+// 과목별 색상 팔레트
+const colorPalette = [
+    '#667eea', // 보라
+    '#f093fb', // 핑크
+    '#4facfe', // 하늘
+    '#43e97b', // 민트
+    '#fa709a', // 연분홍
+    '#feca57', // 노랑
+    '#ff6b6b', // 빨강
+    '#48dbfb', // 청록
+    '#ff9ff3', // 자주
+    '#54a0ff', // 파랑
+    '#00d2d3', // 청록2
+    '#5f27cd', // 진보라
+    '#ff6348', // 주황
+    '#1dd1a1', // 녹색
+    '#ee5a6f', // 장미
+];
+
+// 과목에 색상 할당하는 함수
+function getColorForSubject(subject) {
+    // 빈 과목명이면 기본 색상
+    if (!subject || subject.trim() === '') {
+        return '#868e96';
+    }
+    
+    const normalizedSubject = subject.trim();
+    
+    // 이미 색상이 할당되어 있으면 반환
+    if (subjectColors[normalizedSubject]) {
+        return subjectColors[normalizedSubject];
+    }
+    
+    // 새 과목이면 색상 할당
+    const usedColors = Object.values(subjectColors);
+    let newColor;
+    
+    // 아직 사용하지 않은 색상 찾기
+    for (let color of colorPalette) {
+        if (!usedColors.includes(color)) {
+            newColor = color;
+            break;
+        }
+    }
+    
+    // 모든 색상을 사용했다면 랜덤으로 할당
+    if (!newColor) {
+        newColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+    }
+    
+    subjectColors[normalizedSubject] = newColor;
+    localStorage.setItem("subjectColors", JSON.stringify(subjectColors));
+    
+    return newColor;
+}
+
+function showNotification(type) {
+    // 기존 알림 제거
+    const existingNotifications = document.querySelectorAll('.notification');
+    existingNotifications.forEach(n => n.remove());
+
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    let title, message;
+    if (type === 'study') {
+        title = '공부 시작!';
+        message = '휴식이 끝났습니다. 다시 집중할 시간입니다!';
+    } else {
+        title = '휴식 시간!';
+        message = '수고하셨습니다! 잠시 쉬어가세요.';
+    }
+    
+    notification.innerHTML = `
+        <div class="notification-header">
+            <div class="notification-title">${title}</div>
+            <button class="notification-close">×</button>
+        </div>
+        <div class="notification-message">${message}</div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // 닫기 버튼 이벤트
+    const closeBtn = notification.querySelector('.notification-close');
+    closeBtn.onclick = () => {
+        notification.classList.add('hiding');
+        setTimeout(() => notification.remove(), 400);
+    };
+    
+    // 5초 후 자동 닫기
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.classList.add('hiding');
+            setTimeout(() => notification.remove(), 400);
+        }
+    }, 5000);
+    
+    // 알림음 재생 (간단한 beep)
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = type === 'study' ? 800 : 600;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (e) {
+        console.log('Audio not supported');
+    }
+}
+
+function formatTime(date) {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+function formatDuration(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins > 0) {
+        return `${mins}분 ${secs}초`;
+    }
+    return `${secs}초`;
+}
+
+function updateTimeline() {
+    timelineBar.innerHTML = '';
+    timelineLegend.innerHTML = '';
+    
+    if (timeline.length === 0) {
+        timelineBar.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #868e96; font-size: 13px;">아직 기록이 없습니다</div>';
+        return;
+    }
+
+    // 시간 기준으로 오름차순 정렬 (시간 흐름대로)
+    const sortedTimeline = [...timeline].sort((a, b) => a.startTime - b.startTime);
+    
+    // 총 시간 계산
+    const totalDuration = sortedTimeline.reduce((sum, item) => sum + item.duration, 0);
+    
+    // 바 차트 생성
+    sortedTimeline.forEach(item => {
+        const segment = document.createElement('div');
+        segment.className = 'timeline-segment';
+        
+        // 비율 계산
+        const percentage = (item.duration / totalDuration) * 100;
+        segment.style.width = percentage + '%';
+        
+        // 색상 설정
+        let color;
+        if (item.type === 'break') {
+            color = '#51cf66'; // 휴식은 녹색
+        } else {
+            color = getColorForSubject(item.subject);
+        }
+        segment.style.backgroundColor = color;
+        
+        // 툴팁 추가
+        const tooltip = document.createElement('div');
+        tooltip.className = 'timeline-tooltip';
+        const startDate = new Date(item.startTime);
+        const endDate = new Date(item.endTime);
+        tooltip.textContent = `${item.type === 'study' ? (item.subject || '과목 미지정') : '휴식'} (${formatTime(startDate)}-${formatTime(endDate)})`;
+        segment.appendChild(tooltip);
+        
+        timelineBar.appendChild(segment);
+    });
+    
+    // 범례 생성 (최신이 위로)
+    [...sortedTimeline].reverse().forEach(item => {
+        const legendItem = document.createElement('div');
+        legendItem.className = 'timeline-legend-item';
+        
+        let color;
+        if (item.type === 'break') {
+            color = '#51cf66';
+        } else {
+            color = getColorForSubject(item.subject);
+        }
+        
+        const startDate = new Date(item.startTime);
+        const endDate = new Date(item.endTime);
+        
+        legendItem.innerHTML = `
+            <div class="timeline-legend-color" style="background-color: ${color}"></div>
+            <div class="timeline-legend-info">
+                <div class="timeline-legend-subject">${item.type === 'study' ? (item.subject || '과목 미지정') : '휴식 시간'}</div>
+                <div class="timeline-legend-time">${formatTime(startDate)} - ${formatTime(endDate)} (${formatDuration(item.duration)})</div>
+            </div>
+        `;
+        
+        timelineLegend.appendChild(legendItem);
+    });
+}
 
 function updateTimerDisplay() {
     const min = Math.floor(remainingSeconds / 60);
@@ -347,61 +770,125 @@ function getCurrentModeSeconds() {
     return (isStudy ? Number(studyTime.value) : Number(breakTime.value)) * 60;
 }
 
-document.getElementById("startBtn").onclick = () => {
-    if (timerInterval) return;
-    if (remainingSeconds <= 0) remainingSeconds = getCurrentModeSeconds();
+function addToTimeline(type, subject, duration, startTime, endTime) {
+    timeline.push({
+        type: type,
+        subject: subject,
+        duration: duration,
+        startTime: startTime,
+        endTime: endTime
+    });
+    localStorage.setItem("timeline", JSON.stringify(timeline));
+    updateTimeline();
+}
 
-    timerInterval = setInterval(() => {
-        remainingSeconds--;
+function tick() {
+    const now = Date.now();
+    
+    if (targetEndTime && now >= targetEndTime) {
+        // 타이머 종료
+        remainingSeconds = 0;
+        updateTimerDisplay();
+        
+        // 세션 종료 - 타임라인에 추가
+        const endTime = Date.now();
+        const duration = Math.floor((endTime - sessionStartTime) / 1000);
+        
+        if (isStudy) {
+            const subject = currentSubjectInput.value.trim();
+            addToTimeline('study', subject, duration, sessionStartTime, endTime);
+            
+            sessionCount++;
+            localStorage.setItem("sessionCount", sessionCount);
+            document.getElementById("sessionCount").innerText = sessionCount;
+        } else {
+            addToTimeline('break', '', duration, sessionStartTime, endTime);
+        }
 
+        isStudy = !isStudy;
+        modeEl.innerText = isStudy ? "공부 중" : "휴식 중";
+        
+        // 알림 표시
+        showNotification(isStudy ? 'study' : 'break');
+        
+        remainingSeconds = getCurrentModeSeconds();
+        sessionStartTime = Date.now();
+        targetEndTime = sessionStartTime + (remainingSeconds * 1000);
+    } else if (targetEndTime) {
+        // 남은 시간 계산
+        remainingSeconds = Math.ceil((targetEndTime - now) / 1000);
+        updateTimerDisplay();
+        
         if (isStudy) {
             totalStudyTime++;
             localStorage.setItem("totalStudyTime", totalStudyTime);
             document.getElementById("totalTime").innerText = totalStudyTime;
         }
+    }
+}
 
-        updateTimerDisplay();
+document.getElementById("startBtn").onclick = () => {
+    if (timerInterval) return;
+    if (remainingSeconds <= 0) remainingSeconds = getCurrentModeSeconds();
 
-        if (remainingSeconds <= 0) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-
-            if (isStudy) {
-                sessionCount++;
-                localStorage.setItem("sessionCount", sessionCount);
-                document.getElementById("sessionCount").innerText = sessionCount;
-            }
-
-            isStudy = !isStudy;
-            modeEl.innerText = isStudy ? "공부 중" : "휴식 중";
-        }
-    }, 1000);
+    // 세션 시작
+    if (!sessionStartTime) {
+        sessionStartTime = Date.now();
+    }
+    
+    // 목표 종료 시간 설정
+    targetEndTime = Date.now() + (remainingSeconds * 1000);
+    
+    timerInterval = setInterval(tick, 1000);
 };
 
 document.getElementById("stopBtn").onclick = () => {
-    clearInterval(timerInterval);
-    timerInterval = null;
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        
+        // 현재 남은 시간을 정확히 계산
+        if (targetEndTime) {
+            const now = Date.now();
+            remainingSeconds = Math.max(0, Math.ceil((targetEndTime - now) / 1000));
+            updateTimerDisplay();
+        }
+        
+        targetEndTime = null;
+    }
 };
 
 document.getElementById("resetTimeBtn").onclick = () => {
     remainingSeconds = getCurrentModeSeconds();
     updateTimerDisplay();
+    sessionStartTime = null;
+    targetEndTime = null;
 };
 
 document.getElementById("resetAllBtn").onclick = () => {
-    clearInterval(timerInterval);
-    timerInterval = null;
-    isStudy = true;
-    sessionCount = 0;
-    totalStudyTime = 0;
-    localStorage.clear();
-    document.querySelectorAll(".post-it").forEach(p => p.remove());
-    distractionInput.value = "";
-    remainingSeconds = getCurrentModeSeconds();
-    modeEl.innerText = "공부 중";
-    document.getElementById("sessionCount").innerText = 0;
-    document.getElementById("totalTime").innerText = 0;
-    updateTimerDisplay();
+    if (confirm('모든 데이터(통계 및 타임라인)가 삭제됩니다. 계속하시겠습니까?')) {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+        isStudy = true;
+        sessionCount = 0;
+        totalStudyTime = 0;
+        timeline = [];
+        subjectColors = {};
+        sessionStartTime = null;
+        targetEndTime = null;
+        localStorage.clear();
+        document.querySelectorAll(".post-it").forEach(p => p.remove());
+        distractionInput.value = "";
+        currentSubjectInput.value = "";
+        remainingSeconds = getCurrentModeSeconds();
+        modeEl.innerText = "공부 중";
+        document.getElementById("sessionCount").innerText = 0;
+        document.getElementById("totalTime").innerText = 0;
+        updateTimerDisplay();
+        updateTimeline();
+    }
 };
 
 document.getElementById("submitDistractionBtn").onclick = () => {
@@ -412,6 +899,12 @@ document.getElementById("submitDistractionBtn").onclick = () => {
         const penalty = Number(penaltyPerChar.value);
         const addedSeconds = text.length * penalty;
         remainingSeconds += addedSeconds;
+        
+        // 타이머가 실행 중이면 목표 시간도 연장
+        if (targetEndTime) {
+            targetEndTime += addedSeconds * 1000;
+        }
+        
         updateTimerDisplay();
     }
 
@@ -452,6 +945,7 @@ document.getElementById("clearPostItBtn").onclick = () => {
 
 remainingSeconds = getCurrentModeSeconds();
 updateTimerDisplay();
+updateTimeline();
 </script>
 
 </body>
