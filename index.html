@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>집중 타이머</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
     * {
         box-sizing: border-box;
@@ -419,6 +420,13 @@
         line-height: 1.5;
         color: #333;
         border-top: 20px solid rgba(255, 193, 7, 0.3);
+        cursor: move;
+        user-select: none;
+    }
+
+    .post-it.dragging {
+        opacity: 0.8;
+        z-index: 1000;
     }
 
     .post-it button {
@@ -442,6 +450,28 @@
     .post-it button:hover {
         background: #fa5252;
         transform: scale(1.1);
+    }
+
+    /* 30일 추세 그래프 */
+    .trend-chart {
+        margin-top: 25px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 10px;
+    }
+
+    .trend-chart h3 {
+        margin: 0 0 15px 0;
+        font-size: 16px;
+        color: #495057;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 200px;
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
     }
 
     @media (max-width: 480px) {
@@ -516,13 +546,20 @@
     <div class="stats">
         <strong>통계</strong><br>
         공부 횟수: <span class="stat-value" id="sessionCount">0</span>회<br>
-        총 공부 시간: <span class="stat-value" id="totalTime">0</span>초
+        총 공부 시간: <span class="stat-value" id="totalTime">0:00:00</span>
     </div>
 
     <div class="timeline">
         <h3>오늘의 타임라인</h3>
         <div class="timeline-bar-container" id="timelineBar"></div>
         <div class="timeline-legend" id="timelineLegend"></div>
+    </div>
+
+    <div class="trend-chart">
+        <h3>30일 공부 추세</h3>
+        <div class="chart-container">
+            <canvas id="trendChart"></canvas>
+        </div>
     </div>
 </div>
 
@@ -532,11 +569,13 @@ let remainingSeconds = 0;
 let isStudy = true;
 let sessionStartTime = null;
 let targetEndTime = null;
+let pauseStartTime = null;
 
 let sessionCount = Number(localStorage.getItem("sessionCount")) || 0;
 let totalStudyTime = Number(localStorage.getItem("totalStudyTime")) || 0;
 let timeline = JSON.parse(localStorage.getItem("timeline")) || [];
 let subjectColors = JSON.parse(localStorage.getItem("subjectColors")) || {};
+let dailyStats = JSON.parse(localStorage.getItem("dailyStats")) || {};
 
 const ui = document.getElementById("uiContainer");
 const timerEl = document.getElementById("timer");
@@ -551,9 +590,9 @@ const breakTime = document.getElementById("breakTime");
 const penaltyPerChar = document.getElementById("penaltyPerChar");
 
 document.getElementById("sessionCount").innerText = sessionCount;
-document.getElementById("totalTime").innerText = totalStudyTime;
+document.getElementById("totalTime").innerText = formatTotalTime(totalStudyTime);
 
-// 과목별 색상 팔레트
+// 과목별 색상 팔레트 (빨간색 제외)
 const colorPalette = [
     '#667eea', // 보라
     '#f093fb', // 핑크
@@ -561,36 +600,140 @@ const colorPalette = [
     '#43e97b', // 민트
     '#fa709a', // 연분홍
     '#feca57', // 노랑
-    '#ff6b6b', // 빨강
     '#48dbfb', // 청록
     '#ff9ff3', // 자주
     '#54a0ff', // 파랑
     '#00d2d3', // 청록2
     '#5f27cd', // 진보라
-    '#ff6348', // 주황
+    '#ff9068', // 주황 (빨간색 대신)
     '#1dd1a1', // 녹색
     '#ee5a6f', // 장미
 ];
 
+// 총 공부시간 형식 변환 (초 → H:MM:SS)
+function formatTotalTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+// 날짜 키 생성 (YYYY-MM-DD)
+function getDateKey(date = new Date()) {
+    return date.toISOString().split('T')[0];
+}
+
+// 일일 통계 업데이트
+function updateDailyStats(studySeconds) {
+    const today = getDateKey();
+    if (!dailyStats[today]) {
+        dailyStats[today] = 0;
+    }
+    dailyStats[today] += studySeconds;
+    
+    // 30일 이전 데이터 정리
+    const keys = Object.keys(dailyStats).sort();
+    if (keys.length > 30) {
+        const toDelete = keys.slice(0, keys.length - 30);
+        toDelete.forEach(key => delete dailyStats[key]);
+    }
+    
+    localStorage.setItem("dailyStats", JSON.stringify(dailyStats));
+    updateTrendChart();
+}
+
+// 추세 그래프 업데이트
+let trendChart = null;
+function updateTrendChart() {
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    
+    // 최근 30일 날짜 생성
+    const dates = [];
+    const data = [];
+    const today = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateKey = getDateKey(date);
+        dates.push(dateKey);
+        data.push(Math.floor((dailyStats[dateKey] || 0) / 60)); // 분 단위로 변환
+    }
+    
+    if (trendChart) {
+        trendChart.destroy();
+    }
+    
+    trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates.map(d => {
+                const [year, month, day] = d.split('-');
+                return `${month}/${day}`;
+            }),
+            datasets: [{
+                label: '공부 시간 (분)',
+                data: data,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: '#667eea',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.y}분`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '분';
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                }
+            }
+        }
+    });
+}
+
 // 과목에 색상 할당하는 함수
 function getColorForSubject(subject) {
-    // 빈 과목명이면 기본 색상
     if (!subject || subject.trim() === '') {
         return '#868e96';
     }
     
     const normalizedSubject = subject.trim();
     
-    // 이미 색상이 할당되어 있으면 반환
     if (subjectColors[normalizedSubject]) {
         return subjectColors[normalizedSubject];
     }
     
-    // 새 과목이면 색상 할당
     const usedColors = Object.values(subjectColors);
     let newColor;
     
-    // 아직 사용하지 않은 색상 찾기
     for (let color of colorPalette) {
         if (!usedColors.includes(color)) {
             newColor = color;
@@ -598,7 +741,6 @@ function getColorForSubject(subject) {
         }
     }
     
-    // 모든 색상을 사용했다면 랜덤으로 할당
     if (!newColor) {
         newColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
     }
@@ -610,7 +752,6 @@ function getColorForSubject(subject) {
 }
 
 function showNotification(type) {
-    // 기존 알림 제거
     const existingNotifications = document.querySelectorAll('.notification');
     existingNotifications.forEach(n => n.remove());
 
@@ -636,14 +777,12 @@ function showNotification(type) {
     
     document.body.appendChild(notification);
     
-    // 닫기 버튼 이벤트
     const closeBtn = notification.querySelector('.notification-close');
     closeBtn.onclick = () => {
         notification.classList.add('hiding');
         setTimeout(() => notification.remove(), 400);
     };
     
-    // 5초 후 자동 닫기
     setTimeout(() => {
         if (notification.parentElement) {
             notification.classList.add('hiding');
@@ -651,7 +790,6 @@ function showNotification(type) {
         }
     }, 5000);
     
-    // 알림음 재생 (간단한 beep)
     try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
@@ -697,42 +835,38 @@ function updateTimeline() {
         return;
     }
 
-    // 시간 기준으로 오름차순 정렬 (시간 흐름대로)
     const sortedTimeline = [...timeline].sort((a, b) => a.startTime - b.startTime);
-    
-    // 총 시간 계산
     const totalDuration = sortedTimeline.reduce((sum, item) => sum + item.duration, 0);
     
-    // 바 차트 생성
     sortedTimeline.forEach(item => {
         const segment = document.createElement('div');
         segment.className = 'timeline-segment';
         
-        // 비율 계산
         const percentage = (item.duration / totalDuration) * 100;
         segment.style.width = percentage + '%';
         
-        // 색상 설정
         let color;
         if (item.type === 'break') {
-            color = '#51cf66'; // 휴식은 녹색
+            color = '#51cf66';
+        } else if (item.type === 'pause') {
+            color = '#ff6b6b'; // 중단은 빨간색
         } else {
             color = getColorForSubject(item.subject);
         }
         segment.style.backgroundColor = color;
         
-        // 툴팁 추가
         const tooltip = document.createElement('div');
         tooltip.className = 'timeline-tooltip';
         const startDate = new Date(item.startTime);
         const endDate = new Date(item.endTime);
-        tooltip.textContent = `${item.type === 'study' ? (item.subject || '과목 미지정') : '휴식'} (${formatTime(startDate)}-${formatTime(endDate)})`;
+        let label = item.type === 'study' ? (item.subject || '과목 미지정') : 
+                    item.type === 'break' ? '휴식' : '중단';
+        tooltip.textContent = `${label} (${formatTime(startDate)}-${formatTime(endDate)})`;
         segment.appendChild(tooltip);
         
         timelineBar.appendChild(segment);
     });
     
-    // 범례 생성 (최신이 위로)
     [...sortedTimeline].reverse().forEach(item => {
         const legendItem = document.createElement('div');
         legendItem.className = 'timeline-legend-item';
@@ -740,17 +874,21 @@ function updateTimeline() {
         let color;
         if (item.type === 'break') {
             color = '#51cf66';
+        } else if (item.type === 'pause') {
+            color = '#ff6b6b';
         } else {
             color = getColorForSubject(item.subject);
         }
         
         const startDate = new Date(item.startTime);
         const endDate = new Date(item.endTime);
+        let label = item.type === 'study' ? (item.subject || '과목 미지정') : 
+                    item.type === 'break' ? '휴식 시간' : '중단됨';
         
         legendItem.innerHTML = `
             <div class="timeline-legend-color" style="background-color: ${color}"></div>
             <div class="timeline-legend-info">
-                <div class="timeline-legend-subject">${item.type === 'study' ? (item.subject || '과목 미지정') : '휴식 시간'}</div>
+                <div class="timeline-legend-subject">${label}</div>
                 <div class="timeline-legend-time">${formatTime(startDate)} - ${formatTime(endDate)} (${formatDuration(item.duration)})</div>
             </div>
         `;
@@ -786,11 +924,9 @@ function tick() {
     const now = Date.now();
     
     if (targetEndTime && now >= targetEndTime) {
-        // 타이머 종료
         remainingSeconds = 0;
         updateTimerDisplay();
         
-        // 세션 종료 - 타임라인에 추가
         const endTime = Date.now();
         const duration = Math.floor((endTime - sessionStartTime) / 1000);
         
@@ -801,6 +937,9 @@ function tick() {
             sessionCount++;
             localStorage.setItem("sessionCount", sessionCount);
             document.getElementById("sessionCount").innerText = sessionCount;
+            
+            // 일일 통계 업데이트
+            updateDailyStats(duration);
         } else {
             addToTimeline('break', '', duration, sessionStartTime, endTime);
         }
@@ -808,35 +947,44 @@ function tick() {
         isStudy = !isStudy;
         modeEl.innerText = isStudy ? "공부 중" : "휴식 중";
         
-        // 알림 표시
         showNotification(isStudy ? 'study' : 'break');
         
         remainingSeconds = getCurrentModeSeconds();
         sessionStartTime = Date.now();
         targetEndTime = sessionStartTime + (remainingSeconds * 1000);
     } else if (targetEndTime) {
-        // 남은 시간 계산
         remainingSeconds = Math.ceil((targetEndTime - now) / 1000);
         updateTimerDisplay();
         
         if (isStudy) {
             totalStudyTime++;
             localStorage.setItem("totalStudyTime", totalStudyTime);
-            document.getElementById("totalTime").innerText = totalStudyTime;
+            document.getElementById("totalTime").innerText = formatTotalTime(totalStudyTime);
         }
     }
 }
 
 document.getElementById("startBtn").onclick = () => {
     if (timerInterval) return;
+    
+    // 중단에서 복귀하는 경우 - 중단 시간 기록
+    if (pauseStartTime) {
+        const pauseEnd = Date.now();
+        const pauseDuration = Math.floor((pauseEnd - pauseStartTime) / 1000);
+        
+        if (pauseDuration > 0) {
+            addToTimeline('pause', '', pauseDuration, pauseStartTime, pauseEnd);
+        }
+        
+        pauseStartTime = null;
+    }
+    
     if (remainingSeconds <= 0) remainingSeconds = getCurrentModeSeconds();
 
-    // 세션 시작
     if (!sessionStartTime) {
         sessionStartTime = Date.now();
     }
     
-    // 목표 종료 시간 설정
     targetEndTime = Date.now() + (remainingSeconds * 1000);
     
     timerInterval = setInterval(tick, 1000);
@@ -847,18 +995,51 @@ document.getElementById("stopBtn").onclick = () => {
         clearInterval(timerInterval);
         timerInterval = null;
         
-        // 현재 남은 시간을 정확히 계산
+        // 진행 중이던 세션 기록 추가
+        if (sessionStartTime && targetEndTime) {
+            const now = Date.now();
+            const sessionDuration = Math.floor((now - sessionStartTime) / 1000);
+            
+            if (sessionDuration > 0) {
+                if (isStudy) {
+                    const subject = currentSubjectInput.value.trim();
+                    addToTimeline('study', subject, sessionDuration, sessionStartTime, now);
+                    
+                    // 공부 시간 통계 반영
+                    updateDailyStats(sessionDuration);
+                } else {
+                    addToTimeline('break', '', sessionDuration, sessionStartTime, now);
+                }
+            }
+        }
+        
         if (targetEndTime) {
             const now = Date.now();
             remainingSeconds = Math.max(0, Math.ceil((targetEndTime - now) / 1000));
             updateTimerDisplay();
         }
         
+        // 중단 시작 시간 기록
+        pauseStartTime = Date.now();
+        
         targetEndTime = null;
+        sessionStartTime = null;
     }
 };
 
 document.getElementById("resetTimeBtn").onclick = () => {
+    // 중단 중이었다면 중단 시간 기록
+    if (pauseStartTime && !timerInterval) {
+        const pauseEnd = Date.now();
+        const pauseDuration = Math.floor((pauseEnd - pauseStartTime) / 1000);
+        
+        if (pauseDuration > 0) {
+            addToTimeline('pause', '', pauseDuration, pauseStartTime, pauseEnd);
+        }
+        
+        pauseStartTime = null;
+    }
+    
     remainingSeconds = getCurrentModeSeconds();
     updateTimerDisplay();
     sessionStartTime = null;
@@ -876,8 +1057,10 @@ document.getElementById("resetAllBtn").onclick = () => {
         totalStudyTime = 0;
         timeline = [];
         subjectColors = {};
+        dailyStats = {};
         sessionStartTime = null;
         targetEndTime = null;
+        pauseStartTime = null;
         localStorage.clear();
         document.querySelectorAll(".post-it").forEach(p => p.remove());
         distractionInput.value = "";
@@ -885,9 +1068,10 @@ document.getElementById("resetAllBtn").onclick = () => {
         remainingSeconds = getCurrentModeSeconds();
         modeEl.innerText = "공부 중";
         document.getElementById("sessionCount").innerText = 0;
-        document.getElementById("totalTime").innerText = 0;
+        document.getElementById("totalTime").innerText = formatTotalTime(0);
         updateTimerDisplay();
         updateTimeline();
+        updateTrendChart();
     }
 };
 
@@ -900,7 +1084,6 @@ document.getElementById("submitDistractionBtn").onclick = () => {
         const addedSeconds = text.length * penalty;
         remainingSeconds += addedSeconds;
         
-        // 타이머가 실행 중이면 목표 시간도 연장
         if (targetEndTime) {
             targetEndTime += addedSeconds * 1000;
         }
@@ -936,6 +1119,76 @@ document.getElementById("submitDistractionBtn").onclick = () => {
     postIt.appendChild(document.createTextNode(text));
     document.body.appendChild(postIt);
 
+    // 포스트잇 드래그 기능
+    let isDragging = false;
+    let currentX;
+    let currentY;
+    let initialX;
+    let initialY;
+    let xOffset = 0;
+    let yOffset = 0;
+
+    postIt.addEventListener("mousedown", dragStart);
+    postIt.addEventListener("touchstart", dragStart);
+
+    function dragStart(e) {
+        if (e.target.tagName === 'BUTTON') return; // 닫기 버튼 클릭 시 드래그 방지
+        
+        if (e.type === "touchstart") {
+            initialX = e.touches[0].clientX - xOffset;
+            initialY = e.touches[0].clientY - yOffset;
+        } else {
+            initialX = e.clientX - xOffset;
+            initialY = e.clientY - yOffset;
+        }
+
+        isDragging = true;
+        postIt.classList.add('dragging');
+
+        document.addEventListener("mousemove", drag);
+        document.addEventListener("touchmove", drag);
+        document.addEventListener("mouseup", dragEnd);
+        document.addEventListener("touchend", dragEnd);
+    }
+
+    function drag(e) {
+        if (!isDragging) return;
+
+        e.preventDefault();
+
+        if (e.type === "touchmove") {
+            currentX = e.touches[0].clientX - initialX;
+            currentY = e.touches[0].clientY - initialY;
+        } else {
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+        }
+
+        xOffset = currentX;
+        yOffset = currentY;
+
+        const currentLeft = parseFloat(postIt.style.left);
+        const currentTop = parseFloat(postIt.style.top);
+
+        postIt.style.left = (currentLeft + currentX - (parseFloat(postIt.dataset.lastX) || 0)) + "px";
+        postIt.style.top = (currentTop + currentY - (parseFloat(postIt.dataset.lastY) || 0)) + "px";
+
+        postIt.dataset.lastX = currentX;
+        postIt.dataset.lastY = currentY;
+    }
+
+    function dragEnd(e) {
+        isDragging = false;
+        postIt.classList.remove('dragging');
+        postIt.dataset.lastX = 0;
+        postIt.dataset.lastY = 0;
+
+        document.removeEventListener("mousemove", drag);
+        document.removeEventListener("touchmove", drag);
+        document.removeEventListener("mouseup", dragEnd);
+        document.removeEventListener("touchend", dragEnd);
+    }
+
     distractionInput.value = "";
 };
 
@@ -946,6 +1199,7 @@ document.getElementById("clearPostItBtn").onclick = () => {
 remainingSeconds = getCurrentModeSeconds();
 updateTimerDisplay();
 updateTimeline();
+updateTrendChart();
 </script>
 
 </body>
