@@ -737,24 +737,31 @@ function formatTotalTime(seconds) {
     return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-// 날짜 키 생성 (YYYY-MM-DD)
+// 한국 시간 기준 날짜 키 생성 (YYYY-MM-DD)
 function getDateKey(date = new Date()) {
-    return date.toISOString().split('T')[0];
+    // UTC+9 (한국 시간) 적용
+    const koreaDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+    const year = koreaDate.getUTCFullYear();
+    const month = String(koreaDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(koreaDate.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 // 날짜에서 n일 더하기/빼기
 function addDays(dateStr, days) {
-    const date = new Date(dateStr + 'T12:00:00');
+    const [year, month, day] = dateStr.split('-');
+    const date = new Date(year, month - 1, day, 12, 0, 0);
     date.setDate(date.getDate() + days);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const newYear = date.getFullYear();
+    const newMonth = String(date.getMonth() + 1).padStart(2, '0');
+    const newDay = String(date.getDate()).padStart(2, '0');
+    return `${newYear}-${newMonth}-${newDay}`;
 }
 
 // 날짜를 한글로 표시
 function formatDateKorean(dateStr) {
-    const date = new Date(dateStr + 'T00:00:00');
+    const [year, month, day] = dateStr.split('-');
+    const date = new Date(year, month - 1, day);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(date);
@@ -767,7 +774,6 @@ function formatDateKorean(dateStr) {
     if (diffDays === -1) return '(내일)';
     if (diffDays === 1) return '(어제)';
     
-    const [year, month, day] = dateStr.split('-');
     return `(${month}/${day})`;
 }
 
@@ -1193,6 +1199,11 @@ function tick() {
             localStorage.setItem("sessionCount", sessionCount);
             document.getElementById("sessionCount").innerText = sessionCount;
             
+            // 총 공부시간에 추가
+            totalStudyTime += duration;
+            localStorage.setItem("totalStudyTime", totalStudyTime);
+            document.getElementById("totalTime").innerText = formatTotalTime(totalStudyTime);
+            
             updateDailyStats(duration);
         } else {
             addToTimeline('break', '', duration, sessionStartTime, endTime);
@@ -1209,12 +1220,6 @@ function tick() {
     } else if (targetEndTime) {
         remainingSeconds = Math.ceil((targetEndTime - now) / 1000);
         updateTimerDisplay();
-        
-        if (isStudy) {
-            totalStudyTime++;
-            localStorage.setItem("totalStudyTime", totalStudyTime);
-            document.getElementById("totalTime").innerText = formatTotalTime(totalStudyTime);
-        }
     }
 }
 
@@ -1256,6 +1261,11 @@ document.getElementById("stopBtn").onclick = () => {
                 if (isStudy) {
                     const subject = currentSubjectInput.value.trim();
                     addToTimeline('study', subject, sessionDuration, sessionStartTime, now);
+                    
+                    // 총 공부시간에 추가
+                    totalStudyTime += sessionDuration;
+                    localStorage.setItem("totalStudyTime", totalStudyTime);
+                    document.getElementById("totalTime").innerText = formatTotalTime(totalStudyTime);
                     
                     updateDailyStats(sessionDuration);
                 } else {
@@ -1305,6 +1315,18 @@ document.getElementById("resetDayBtn").onclick = () => {
         if (timerInterval) {
             clearInterval(timerInterval);
             timerInterval = null;
+        }
+        
+        // 오늘 공부한 시간을 dailyStats에서 차감
+        const studyTimeToday = calculateStudyTimeFromTimeline(timeline);
+        const today = getDateKey();
+        if (dailyStats[today]) {
+            dailyStats[today] = Math.max(0, dailyStats[today] - studyTimeToday);
+            if (dailyStats[today] === 0) {
+                delete dailyStats[today];
+            }
+            localStorage.setItem("dailyStats", JSON.stringify(dailyStats));
+            updateTrendChart();
         }
         
         timeline = [];
@@ -1368,7 +1390,7 @@ document.getElementById("submitDistractionBtn").onclick = () => {
     const text = distractionInput.value.trim();
     if (!text) return;
 
-    if (isStudy) {
+    if (isStudy && timerInterval) {
         const penalty = Number(penaltyPerChar.value);
         const addedSeconds = text.length * penalty;
         remainingSeconds += addedSeconds;
