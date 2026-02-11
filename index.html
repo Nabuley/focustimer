@@ -1204,7 +1204,8 @@ function tick() {
             localStorage.setItem("totalStudyTime", totalStudyTime);
             document.getElementById("totalTime").innerText = formatTotalTime(totalStudyTime);
             
-            updateDailyStats(duration);
+            // 실시간 30일 추세 그래프 반영 제거 - 하루 마무리 시에만 저장
+            // updateDailyStats(duration);
         } else {
             addToTimeline('break', '', duration, sessionStartTime, endTime);
         }
@@ -1267,7 +1268,8 @@ document.getElementById("stopBtn").onclick = () => {
                     localStorage.setItem("totalStudyTime", totalStudyTime);
                     document.getElementById("totalTime").innerText = formatTotalTime(totalStudyTime);
                     
-                    updateDailyStats(sessionDuration);
+                    // 실시간 30일 추세 그래프 반영 제거 - 하루 마무리 시에만 저장
+                    // updateDailyStats(sessionDuration);
                 } else {
                     addToTimeline('break', '', sessionDuration, sessionStartTime, now);
                 }
@@ -1317,17 +1319,8 @@ document.getElementById("resetDayBtn").onclick = () => {
             timerInterval = null;
         }
         
-        // 오늘 공부한 시간을 dailyStats에서 차감
-        const studyTimeToday = calculateStudyTimeFromTimeline(timeline);
-        const today = getDateKey();
-        if (dailyStats[today]) {
-            dailyStats[today] = Math.max(0, dailyStats[today] - studyTimeToday);
-            if (dailyStats[today] === 0) {
-                delete dailyStats[today];
-            }
-            localStorage.setItem("dailyStats", JSON.stringify(dailyStats));
-            updateTrendChart();
-        }
+        // 하루 초기화 시에는 dailyStats를 건드리지 않음 (애초에 저장 안 했으므로)
+        // 기존 코드에서 dailyStats 차감 로직 제거
         
         timeline = [];
         localStorage.setItem("timeline", JSON.stringify(timeline));
@@ -1529,21 +1522,14 @@ function finishDayProcess() {
             return;
         }
         
-        const today = getDateKey();
-        
+        // 타임라인 히스토리에 저장
         if (!timelineHistory[selectedDate]) {
             timelineHistory[selectedDate] = [];
         }
         timelineHistory[selectedDate] = [...timelineHistory[selectedDate], ...timeline];
         localStorage.setItem("timelineHistory", JSON.stringify(timelineHistory));
         
-        if (dailyStats[today]) {
-            dailyStats[today] = Math.max(0, dailyStats[today] - studyTime);
-            if (dailyStats[today] === 0) {
-                delete dailyStats[today];
-            }
-        }
-        
+        // 선택한 날짜에 dailyStats 추가 (여기서만 추가됨)
         if (!dailyStats[selectedDate]) {
             dailyStats[selectedDate] = 0;
         }
@@ -1571,6 +1557,7 @@ function finishDayProcess() {
         document.getElementById("sessionCount").innerText = sessionCount;
         document.getElementById("totalTime").innerText = formatTotalTime(totalStudyTime);
         
+        const today = getDateKey();
         currentStudyDate = today;
         localStorage.setItem("currentStudyDate", currentStudyDate);
         
